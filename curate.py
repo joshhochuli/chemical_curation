@@ -17,34 +17,31 @@ import pandas
 
 class Mol:
 
+    @classmethod
+    def from_mol_string(cls, mol_string, precise_activities = None, imprecise_activities = None):
+        inchi = process_mol_string(mol_string)
+        return cls(inchi, precise_activities, imprecise_activities)
+
+    @classmethod
+    def from_inchi(cls, inchi, precise_activities = None, imprecise_activities = None):
+        inchi = process_inchi(inchi)
+        return cls(inchi, precise_activities, imprecise_activities)
+
+    @classmethod
+    def from_smiles(cls, smiles, precise_activities = None, imprecise_activities = None):
+        inchi = process_smiles(smiles)
+        return cls(inchi, precise_activities, imprecise_activities, smiles = smiles)
+
     #activities should be a dict of name:value (e.g. {'kd':7})
     #assume nanomolar for concentrations
-    def __init__(self, mol_string = None, inchi = None, smiles = None, precise_activities = None, imprecise_activities = None):
+    def __init__(self, inchi, precise_activities, imprecise_activities):
 
         if not precise_activities and not imprecise_activities:
             raise Exception("no activity provided to Mol init())")
 
         self.precise_activities = precise_activities
         self.imprecise_activities = imprecise_activities
-
-        if(mol_string and inchi) or (mol_string and smiles) or (smiles and inchi):
-            raise Exception("Only one of mol_string, inchi, or smiles needed")
-
-        if(mol_string):
-            try:
-                self.inchi = process_mol_string(mol_string)
-            except Exception as e:
-                raise
-        elif(inchi):
-            try:
-                self.inchi = process_inchi(inchi)
-            except Exception as e:
-                raise
-        elif(smiles):
-            try:
-                self.inchi = process_smiles(smiles)
-            except Exception as e:
-                raise
+        self.inchi = inchi
 
     def has_activity(self, activity_name):
         if self.precise_activities and self.imprecise_activities:
@@ -80,76 +77,8 @@ class Mol:
 class ManualReviewException(Exception):
     pass
 
-def get_chembl_activities(df, original_filename, targets, activity_type = "STANDARD_TYPE", activity_value ="STANDARD_VALUE", activity_relation = "STANDARD_RELATION", mol_field = "mol", ):
-
-    activity_hits = {}
-
-    if activity_type not in df.columns:
-        print("no")
-    if activity_value not in df.columns:
-        print("no")
-    if activity_relation not in df.columns:
-        print("no")
-
-    mols = []
-    for_review = {}
-
-    stats = {}
-    for i, row in df.iterrows():
-        actual_row = i + 2 #index by one, account for header
-
-        mol_string = row[mol_field]
-
-        precise = {}
-        imprecise = {}
-
-        activity_name = row[activity_type].lower()
-
-        if activity_name in targets:
-
-            precise = row[activity_relation] == "="
-
-            val = row[activity_value]
-
-            target_type = row[activity_type].lower()
-
-            try:
-                if precise:
-                    mol = Mol(mol_string, precise_activities = {target_type:val}, imprecise_activities = None)
-                else:
-                    val = row[activity_relation] + str(val)
-                    mol = Mol(mol_string, precise_activities = None, imprecise_activities = {target_type:val})
-
-                mols.append(mol)
-
-                if activity_name not in stats:
-                    stats[activity_name] = {}
-                    if precise:
-                        stats[activity_name]['precise'] = 1
-                        stats[activity_name]['imprecise'] = 0
-                    else:
-                        stats[activity_name]['imprecise'] = 1
-                        stats[activity_name]['precise'] = 0
-                else:
-                    if precise:
-                        stats[activity_name]['precise'] += 1
-                    else:
-                        stats[activity_name]['imprecise'] += 1
-
-
-            except Exception as e:
-                s = f"{original_filename},row {actual_row},{str(e)}"
-                if target_type in for_review:
-                    for_review[target_type].append(s)
-                else:
-                    for_review[target_type] = [s]
-
-                continue
-
-    return mols, stats, for_review
-
-#todo: do without df.iterrows()
 #needs original filename for manual review cases
+#parses dataframe for mols with desired activities
 def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
     activity_hits = {}
@@ -162,9 +91,8 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
     mol_hits = []
     for col_name in df.columns:
-            if mol_field.lower() in col_name.lower():
-                mol_hits.append(col_name)
-
+        if mol_field.lower() in col_name.lower():
+            mol_hits.append(col_name)
 
     to_remove = []
     for activity_field, hits in activity_hits.items():
@@ -175,7 +103,7 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
         if len(hits) > 1:
             print(f"Supplied activity field name '{activity_field}' is a substring of multiple fields.\n Hits: {activity_hits}\n Exiting.")
             exit()
-        else: 
+        else:
             activity_hits[activity_field] = hits[0]
             print(f"Activity field found: {activity_hits[activity_field]}")
 
@@ -199,15 +127,16 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
     for activity_name, df_activity_name in activity_hits.items():
 
+        #check for empty and null
         u = df[df_activity_name] != ''
         v = pandas.notnull(df[df_activity_name])
         valid = (u & v)
         valid_cols.append(u & v)
 
+    #find rows without any valid activities and report
     final = valid_cols[0]
     for v in valid_cols[1:]:
         final = final | v
-
     not_valid = df[~final]
 
     if len(not_valid) > 0:
@@ -257,7 +186,7 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
 
         try:
-            mol = Mol(mol_string = Chem.MolToMolBlock(original_mol), precise_activities = precise, imprecise_activities = imprecise)
+            mol = Mol.from_mol_string(precise_activities = precise, imprecise_activities = imprecise, mol_string = Chem.MolToMolBlock(original_mol))
             mols.append(mol)
         except Exception as e:
             s = f"{original_filename}\trow {actual_row}\t{str(e)}"
@@ -294,33 +223,14 @@ def process_inchi(inchi):
     return processed_inchi
 
 def process_smiles(smiles):
-    mol = Chem.MolFromInchi(smiles)
+    mol = Chem.MolFromSmiles(smiles)
     processed_inchi = process_mol(mol)
     return processed_inchi
 
 def process_mol(mol):
 
     s = Standardizer()
-
-    '''
-    salt_remover = SaltRemover.SaltRemover()
-    #remove salts
-    mol = salt_remover.StripMol(mol)
-
-    #standardize
-    start_inchi = Chem.MolToInchi(mol)
-    rdMolStandardize.Cleanup(mol)
-    end_inchi = Chem.MolToInchi(mol)
-    if start_inchi != end_inchi:
-        standardized += 1
-
-    #check for mixtures
-    n = Chem.rdmolops.GetMolFrags(mol)
-    if len(n) != 1:
-        raise ManualReviewException(f'{Chem.MolToSmiles(mol)}, "multiple fragments detected"')
-    '''
     mol = s.standardize(mol)
-
     inchi = Chem.MolToInchi(mol)
 
     return inchi
@@ -482,12 +392,10 @@ def main():
     targets = ["ic50", "ki", "kd"]
     output_ending = "curated"
     review_threshold = 10
-    output_dir = "/home/josh/git/cdk9_design/data/curated/without_cyclink"
+    output_dir = "/home/josh/tmp/curation_test"
 
 
-    filenames = ["uncleaned/sdf/chembl_cdk9.sdf", 
-                 "uncleaned/sdf/chembl_cdk9_cyclin_t1.sdf",
-                 "uncleaned/sdf/bindingdb_cdk9_cyclint1.sdf"]
+    filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
 
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
 
