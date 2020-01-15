@@ -5,7 +5,10 @@ from rdkit.Chem import PandasTools
 
 from rdkit import rdBase
 
-from molvs import Standardizer
+import molvs.normalize
+import molvs.fragment
+import molvs.tautomer
+import molvs.metal
 
 rdBase.DisableLog('rdApp.*')
 
@@ -14,6 +17,11 @@ import os
 import math #for rounding
 
 import pandas
+
+#list of atoms allowed for dragon descriptor calculatoin
+dragon_allowed_atoms = set(["H","B","C","N","O","F","Al","Si","P","S","Cl","Cr",
+    "Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Mo","Ag","Cd","In",
+    "Sn","Sb","Te","I","Gd","Pt","Au","Hg","Ti","Pb","Bi"])
 
 class Mol:
 
@@ -30,7 +38,7 @@ class Mol:
     @classmethod
     def from_smiles(cls, smiles, precise_activities = None, imprecise_activities = None):
         inchi = process_smiles(smiles)
-        return cls(inchi, precise_activities, imprecise_activities, smiles = smiles)
+        return cls(inchi, precise_activities, imprecise_activities)
 
     #activities should be a dict of name:value (e.g. {'kd':7})
     #assume nanomolar for concentrations
@@ -156,7 +164,7 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
     for i, row in trimmed_df.iterrows():
         actual_row = i + 2 #index by one, account for header
-        original_mol = row["mol"]
+        original_mol = row[mol_name]
 
         precise = {}
         imprecise = {}
@@ -184,17 +192,30 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
                         stats[activity_name]['imprecise'] += 1
 
 
+        if mol_field == "mol":
+            try:
+                mol = Mol.from_mol_string(precise_activities = precise, imprecise_activities = imprecise, mol_string = Chem.MolToMolBlock(original_mol))
+                mols.append(mol)
+            except Exception as e:
+                s = f"{original_filename}, row {actual_row}, {str(e)}"
+                if activity_name in for_review:
+                    for_review[activity_name].append(s)
+                else:
+                    for_review[activity_name] = [s]
+                continue
 
-        try:
-            mol = Mol.from_mol_string(precise_activities = precise, imprecise_activities = imprecise, mol_string = Chem.MolToMolBlock(original_mol))
-            mols.append(mol)
-        except Exception as e:
-            s = f"{original_filename}\trow {actual_row}\t{str(e)}"
-            if activity_name in for_review:
-                for_review[activity_name].append(s)
-            else:
-                for_review[activity_name] = [s]
-            continue
+        elif mol_field == "smiles":
+            try:
+                mol = Mol.from_smiles(smiles = original_mol, precise_activities = precise,
+                        imprecise_activities = imprecise)
+                mols.append(mol)
+            except Exception as e:
+                s = f"{original_filename}, {original_mol}, {str(e)}"
+                if activity_name in for_review:
+                    for_review[activity_name].append(s)
+                else:
+                    for_review[activity_name] = [s]
+                continue
 
     return mols, stats, for_review
 
@@ -224,13 +245,59 @@ def process_inchi(inchi):
 
 def process_smiles(smiles):
     mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise ManualReviewException(f"SMILES string '{smiles}' does not parse successfully")
     processed_inchi = process_mol(mol)
     return processed_inchi
 
+def check_valid_atoms(mol, allowed_list = dragon_allowed_atoms):
+    for atom in mol.GetAtoms():
+        s = atom.GetSymbol()
+        if s not in allowed_list:
+            raise ManualReviewException(f"'{s}' atom not in list of allowed atoms") 
+
 def process_mol(mol):
 
-    s = Standardizer()
-    mol = s.standardize(mol)
+    #removal of mixtures
+    fragmenter_object = molvs.fragment.LargestFragmentChooser(prefer_organic = True)
+    mol = fragmenter_object.choose(mol)
+    if mol is None:
+        print("Mixture removal failed for molecule")
+
+    #removal of inorganics
+    if not molvs.fragment.is_organic(mol):
+        raise ManualReviewException("Molecule is not organic")
+
+
+    #removal of salts
+    remover = SaltRemover.SaltRemover()
+    mol = remover.StripMol(mol)
+    if mol is None:
+        raise ManualReviewException("Salt removal failed for molecule")
+
+    #structure normalization
+    normalizer = molvs.normalize.Normalizer(normalizations=molvs.normalize.NORMALIZATIONS,
+            max_restarts = molvs.normalize.MAX_RESTARTS)
+    mol = normalizer.normalize(mol)
+    if mol is None:
+        raise ManualReviewException("Normalization failed for molecule")
+
+    #tautomer selection
+    tautomerizer = molvs.tautomer.TautomerCanonicalizer(transforms=molvs.tautomer.TAUTOMER_TRANSFORMS, scores =
+            molvs.tautomer.TAUTOMER_SCORES, max_tautomers=molvs.tautomer.MAX_TAUTOMERS)
+    if mol is None:
+        raise ManualReviewException("Tautomerization failed for molecule")
+
+    #disconnect metals
+    metal_remover = molvs.metal.MetalDisconnector()
+    mol = metal_remover.disconnect(mol)
+    if mol is None:
+        raise ManualReviewException("Metal removal failed for molecule")
+
+    print(Chem.MolToSmiles(mol))
+    #final check for only valid atoms
+    check_valid_atoms(mol)
+
     inchi = Chem.MolToInchi(mol)
 
     return inchi
@@ -264,15 +331,25 @@ def get_mols_from_files(filenames, targets, verbose = True):
                                                      original_filename = filename,
                                                      activity_fields = targets)
 
-        else:
+        elif ".csv" in filename or ".tsv" in filename:
             if ".csv" in filename:
                 sep = ","
             if ".tsv" in filename:
                 sep = "\t"
 
+            print(sep)
+
             df = pandas.read_csv(filename, sep = sep)
 
             mols, stats, for_review = get_activities(df, original_filename = filename, activity_fields = targets)
+
+        elif ".smi" in filename:
+
+            df = pandas.read_csv(filename, sep = ",")
+            print(df)
+
+            mols, stats, for_review = get_activities(df, original_filename =
+                    filename, activity_fields = targets, mol_field = "smiles")
 
         for target in targets:
             t = [x for x in mols if x.has_activity(target)]
@@ -395,7 +472,10 @@ def main():
     output_dir = "/home/josh/tmp/curation_test"
 
 
-    filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
+    #filenames = ["/home/josh/git/chemical_curation/test/failures.smi",
+    #"/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
+    filenames = ["/home/josh/git/chemical_curation/test/failures.smi"]
+    #filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
 
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
 
@@ -443,15 +523,17 @@ def main():
         total_for_review = 0 
         for target, issues in all_for_review.items():
             f.write(target + '\n')
+            print('\n' + target + '\n')
             for issue in issues:
                 total_for_review += 1
                 s = f"    {issue}\n"
-                f.write(s + '\n')
+                f.write(s)
+                print(s, end = "")
 
-        if total_for_review == 0:
-            print("\nNo items needing manual review")
-        else:
-            print(f"\n{total_for_review} items needing manual review, stored at {review_filename}\n")
+    if total_for_review == 0:
+        print("\nNo items needing manual review")
+    else:
+        print(f"\n{total_for_review} items needing manual review, stored at {review_filename}\n")
 
 
 if __name__ == "__main__":
