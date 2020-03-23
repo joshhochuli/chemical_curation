@@ -77,7 +77,7 @@ class Mol:
         return self.imprecise_activities[activity_name]
 
     def __str__(self):
-        return f"{self.input_smiles}\n Precise: {self.precise_activities}\n Imprecise: {self.imprecise_activities}\n"
+        return f"{self.inchi}\n Precise: {self.precise_activities}\n Imprecise: {self.imprecise_activities}\n"
 
     def __repr__(self):
         return self.__str__()
@@ -268,7 +268,6 @@ def process_mol(mol):
     if not molvs.fragment.is_organic(mol):
         raise ManualReviewException("Molecule is not organic")
 
-
     #removal of salts
     remover = SaltRemover.SaltRemover()
     mol = remover.StripMol(mol)
@@ -294,7 +293,6 @@ def process_mol(mol):
     if mol is None:
         raise ManualReviewException("Metal removal failed for molecule")
 
-    print(Chem.MolToSmiles(mol))
     #final check for only valid atoms
     check_valid_atoms(mol)
 
@@ -377,6 +375,18 @@ def get_unique_mols(mols, data_type, target):
                 unique_mols[mol.inchi] = [mol.get_imprecise_activity(target)]
 
     return unique_mols
+
+def deduplicate(inchis, activities):
+
+    d = {}
+
+    for i, inchi in enumerate(inchis):
+        if inchi in d:
+            d[inchi].append(activities[i])
+        else:
+            d[inchi] = [activities[i]]
+
+    return d
 
 
 #data_type should be either "precise" or "imprecise"
