@@ -24,6 +24,12 @@ dragon_allowed_atoms = set(["H","B","C","N","O","F","Al","Si","P","S","Cl","Cr",
     "Sn","Sb","Te","I","Gd","Pt","Au","Hg","Ti","Pb","Bi"])
 
 class Mol:
+    
+    @classmethod
+    def from_rdkit_mol(cls, mol, precise_activities = None, imprecise_activities = None):
+        inchi = process_mol(mol)
+        return cls(inchi, precise_activities, imprecise_activities)
+
 
     @classmethod
     def from_mol_string(cls, mol_string, precise_activities = None, imprecise_activities = None):
@@ -44,7 +50,7 @@ class Mol:
     #assume nanomolar for concentrations
     def __init__(self, inchi, precise_activities, imprecise_activities):
 
-        if not precise_activities and not imprecise_activities:
+        if precise_activities == None and imprecise_activities == None:
             raise Exception("no activity provided to Mol init())")
 
         self.precise_activities = precise_activities
@@ -270,7 +276,7 @@ def process_mol(mol):
 
     #removal of salts
     remover = SaltRemover.SaltRemover()
-    mol = remover.StripMol(mol)
+    mol = remover.StripMol(mol, dontRemoveEverything=True) #tartrate is listed as a salt? what do?
     if mol is None:
         raise ManualReviewException("Salt removal failed for molecule")
 
