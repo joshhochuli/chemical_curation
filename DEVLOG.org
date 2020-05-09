@@ -38,3 +38,5 @@ Definitely need to have good test coverage for a project like this.
     + context.py (import context for tests)
 - Installed package ~click~ for creating a simpe CLI tool, ~tbv~
 - Created setup.py
+- Installed package ~sphinx~ for easily creating documentation; ran
+  ~sphinx-quickstart~ in /docs

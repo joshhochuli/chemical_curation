@@ -7,7 +7,11 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    install_requires=["click", "rdkit", "molvs", "pandas"],
+    install_requires=["click",
+                      "sphinx",
+                      "rdkit",
+                      "molvs",
+                      "pandas"],
 
     entry_points="""
     [console_scripts]
