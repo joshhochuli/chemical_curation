@@ -1,10 +1,13 @@
 # Chemical Curation
 
-This repository provides a Python script for parsing and curation of chemical data. The curation process follows the procedure recommended in the following paper:
+This repository provides a Python script for parsing and curation of chemical
+data. The curation process follows the procedure recommended in the following
+paper:
 
 https://pubs.acs.org/doi/10.1021/ci100176x
 
-Eventually, this repository will include the procedures recommended in the following:
+Eventually, this repository will include the procedures recommended in the
+following:
 
 https://pubs.acs.org/doi/abs/10.1021/acs.jcim.6b00129
 

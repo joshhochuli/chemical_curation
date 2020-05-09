@@ -1,0 +1,40 @@
+* Requirements
+As stated in the README, the curation process has five steps:
+1. data aggregation
+2. sanitization - removal of mixtures, inorganic compounds, and salts
+3. standardization of structures
+4. removal of duplicates
+5. manual review
+
+Want to make a program that is modular, so that you can load just the structure
+standardization piece (for example) and work with that in a Jupyter
+notebook. Need to repackage for this.
+
+Also want to bundle a commandline interface that will take in a file or a list
+of files are perform all steps end-to-end, outputting the cleaned results and a
+list of compounds requiring manual review.
+
+Want to support a good range of file types.
+
+Definitely need to have good test coverage for a project like this.
+
+* Flow of current program
+
+* Log
+** May 9, 2020
+- Installed ~conda~, version 4.8.2
+- Created environment ~chem_cur_env~ locally using ~conda create --prefix
+  ./chem_cur-env~
+- Installed packages ~pandas~, ~rdkit~, and ~molvs~
+- Created simple directory structure:
+  + README (unchanged)
+  + Makefile (currently empty)
+  + tbv (cli for project, currently empty)
+  + chemical_curation
+    + __init__.py (empty)
+    + curate.py (existing file, unchanged)
+  + docs (currently empty)
+  + tests
+    + context.py (import context for tests)
+- Installed package ~click~ for creating a simpe CLI tool, ~tbv~
+- Created setup.py

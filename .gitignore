@@ -1,0 +1,3 @@
+*.pdf
+chem_cur_env/
+__pycache__/
