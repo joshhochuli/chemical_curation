@@ -29,11 +29,12 @@ Definitely need to have good test coverage for a project like this.
 - Created simple directory structure:
   + README (unchanged)
   + Makefile (currently empty)
+  + setup.py
   + tbv (cli for project, currently empty)
   + chemical_curation
     + __init__.py (empty)
     + curate.py (existing file, unchanged)
-  + docs (currently empty)
+  + docs
   + tests
     + context.py (import context for tests)
 - Installed package ~click~ for creating a simpe CLI tool, ~tbv~
