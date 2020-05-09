@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages()
 
 setup(
-    name="TBV",
+    name="ChemicalCuration",
     version="0.0.1",
     description="Library providing functions for curating chemical data according to the Trust But Verify process."
 
@@ -11,11 +11,12 @@ setup(
                       "sphinx",
                       "rdkit",
                       "molvs",
-                      "pandas"],
+                      "pandas",
+                      "unittest"
+                      ],
 
     entry_points="""
     [console_scripts]
-    tbv=tbv:main
-    """
-    
+    chemical_curation=tbv:main
+    """ 
 )

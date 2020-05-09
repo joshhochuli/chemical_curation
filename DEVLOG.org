@@ -20,6 +20,21 @@ Definitely need to have good test coverage for a project like this.
 
 * Flow of current program
 
+* Dependencies
+Libraries used in this project:
+- The [[https://www.rdkit.org/docs/GettingStartedInPython.html][RDKit]], an open-source toolkit for cheminformatics.
+- [[https://molvs.readthedocs.io/en/latest/][MolVS]], a molecule validation and standardization tool built using RDKit
+- [[https://pandas.pydata.org/docs/][Pandas]], for the majority of the dataset manipulation
+- [[https://click.palletsprojects.com/en/7.x/][Click]], the "command line interface creation kit", for creating the cli tool
+- [[https://www.sphinx-doc.org/en/master/][Sphinx]], a tool for creating documentation
+
+Dependencies are handled by [[https://setuptools.readthedocs.io/en/latest/setuptools.html#basic-use][Setuptools]]. Built and managed with [[https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html][conda]].
+
+Project structure in line with official Python recommendations found [[https://packaging.python.org/overview/#][here]] and
+[[https://docs.python-guide.org/writing/structure/#setup-py][here]].
+
+Test info coming soon.
+
 * Log
 ** May 9, 2020
 - Installed ~conda~, version 4.8.2
