@@ -34,9 +34,73 @@ Project structure in line with official Python recommendations found [[https://p
 [[https://docs.python-guide.org/writing/structure/#setup-py][here]].
 
 Test info coming soon.
+https://docs.python-guide.org/writing/tests/
+https://docs.python.org/3/library/unittest.html
+
+* Tasks for 0.1.0 [0/8]
+** TODO Set up `conda-build` build process
+
+- Note taken on [2020-05-10 Sun 12:44] \\
+  [[https://www.youtube.com/watch?v=Kamld5Z-xx0][Michael Sarahan - Making packages and packaging "just work"]]
+  [[https://python-packaging-tutorial.readthedocs.io/en/latest/conda.html][Guide to building `conda` packages]]
+
+** TODO Document build process in CONTRIBUTING.rst
+So it is reproducible and people can easily get the source to develop on.
+
+** TODO Remove hard-coded links in curate.py
+
+** TODO Create CLI
+Thinking of calling the program `tbv`
+
+*** TODO COMMENT Get first working example
+Want to have an executable that takes in a filename or list of filenames and
+executes the entire curation process as currently defined in curate.py.
+
+#+begin_src sh
+  tbv curate filename1 filename2 ...
+#+end_src
+
+*** TODO Add option to specify output location
+#+begin_src sh
+  tbv curate -o output_dir filename1 filename2
+#+end_src
+
+*** TODO Add `verbose` options
+How much logging do we output about what is going on?
+
+#+begin_src sh
+  tbv curate -v -o output_dir filename1 filename2
+#+end_src
+
+*** TODO Add commands for each module
+Keep `curate` for running the full process
+
+#+begin_src sh
+  tbv curate [OPTIONS] filename1 filename2 ...
+  tbv sanitize [OPTIONS] filename1 ...
+  tbv standardize [OPTIONS] filename1 ...
+  tbv dedup [OPTIONS] filename1 ...
+#+end_src
+
+** TODO Add overview documentation
+
+** TODO Add documentation for functions in curate.py
+
+** TODO Refactor curate.py into individual modules
+
+** TODO Add tests for modules
 
 * Log
-** May 9, 2020
+** 10 May 2020
+- GOAL: remove hard-coded links; that means filenames and output_dir in
+  ~main()~ - potentially targets as well?
+- Learning more about how to use conda for development
+  - Added ~conda-build~ to env
+  - Created conda.recipe/ dir and ~meta.yaml~ within
+- Added Tasks section to DEVLOG with goals for an initial beta-release version
+  of the package.
+
+** 9 May 2020
 - Installed ~conda~, version 4.8.2
 - Created environment ~chem_cur_env~ locally using ~conda create --prefix
   ./chem_cur-env~
@@ -56,3 +120,4 @@ Test info coming soon.
 - Created setup.py
 - Installed package ~sphinx~ for easily creating documentation; ran
   ~sphinx-quickstart~ in /docs
+
