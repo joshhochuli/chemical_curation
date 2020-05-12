@@ -1,4 +1,3 @@
-*.pdf
-chem_cur_env/
+resources/
 __pycache__/
 *.egg-info/
