@@ -37,7 +37,7 @@ Test info coming soon.
 https://docs.python-guide.org/writing/tests/
 https://docs.python.org/3/library/unittest.html
 
-* Tasks for 0.1.0 [3/9]
+* Tasks for 0.1.0 [4/9]
 ** DONE Set up `conda-build` build process
 CLOSED: [2020-05-11 Mon 23:04]
 
@@ -198,7 +198,14 @@ Keep `curate` for running the full process
 CLOSED: [2020-05-11 Mon 23:59]
 So it is reproducible and people can easily get the source to develop on.
 
-** TODO Conda devlop?
+** DONE Conda develop?
+CLOSED: [2020-05-12 Tue 11:22]
+- Note taken on [2020-05-12 Tue 10:52] \\
+  Apparently the answer is to use ~pip install --editable~, as ~conda develop~
+  is not maintained and not documented. But pip can't deal with the dependecnies
+  from conda-forge, I don't think. So we're left with the slower and more
+  confusing process of conda-build and conda-install.
+
 Pip has ~pip install --editable~. Conda seems to have some similar, ~conda
 develop~, but there is scant information on how it works.
 
@@ -210,7 +217,16 @@ develop~, but there is scant information on how it works.
 
 ** TODO Add tests for modules
 
+*** TODO Create testing setup
+
 * Log
+
+** 12 May 2020
+- Switched to src/package/modules structure for a better time with testing, as
+  recommended in [[https://blog.ionelmc.ro/2014/05/25/python-packaging/#the-structure][this article]] linked from the PyTest documentation
+  - moved package directory to src/
+  - updated setup.py to reflect changes
+- Looked into conda develop, looks like a no-go.
 
 ** 11 May 2020
 - Fought with ~conda-build~ for a while; findings documented under the
@@ -232,7 +248,7 @@ develop~, but there is scant information on how it works.
   of the package.
 
 ** 9 May 2020
-- Installed ~conda~, version 4.8.2
+- Installed ~conda~, version 4.8.3
 - Created environment ~chem_cur_env~ locally using ~conda create --prefix
   ./chem_cur-env~
 - Installed packages ~pandas~, ~rdkit~, and ~molvs~
