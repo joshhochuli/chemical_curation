@@ -8,7 +8,11 @@ source:
 requirements:
     build:
         - python
-        - setuptools
+        - pandas
+        - click
+        - sphinx
+        - rdkit
+        - molvs
     run:
         - python
         - pandas

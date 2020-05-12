@@ -1,11 +1,11 @@
 from setuptools import setup
 
 requirements = [
-    "Click",
-    "Pandas",
-    # "RDKit",
-    "MolVS",
-    "Sphinx"
+    "click",
+    "pandas",
+    #"rdkit",
+    # "molvs",
+    "sphinx"
 ]
 
 setup(

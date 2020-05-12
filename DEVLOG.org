@@ -1,4 +1,4 @@
-* Requirements
+* Project Goals
 As stated in the README, the curation process has five steps:
 1. data aggregation
 2. sanitization - removal of mixtures, inorganic compounds, and salts
@@ -37,8 +37,21 @@ Test info coming soon.
 https://docs.python-guide.org/writing/tests/
 https://docs.python.org/3/library/unittest.html
 
-* Tasks for 0.1.0 [0/8]
-** TODO Set up `conda-build` build process
+* Tasks for 0.1.0 [3/9]
+** DONE Set up `conda-build` build process
+CLOSED: [2020-05-11 Mon 23:04]
+
+- Note taken on [2020-05-11 Mon 23:03] \\
+  It works! I don't know why, but conda-build and conda-install are now working.
+  Steps taken:
+  + added "conda-forge" and "local" to channels in .condarc. Don't know if this
+    one actually made a difference.
+  + set channel_priority to strict in .condarc. Pretty sure this didn't change
+    anything either.
+  + commented out "rdkit" and "molvs" in setup.py. I think what happends is
+    these packages are only found in conda-forge and somehow conda and
+    setuptools are not syncing up when they look for the packages and so conda
+    thinks setuptools is trying to install something else.
 
 - Note taken on [2020-05-11 Mon 20:10] \\
   Pip works just fine in the conda environment and the click/setuptools
@@ -143,10 +156,8 @@ https://docs.python.org/3/library/unittest.html
   [[https://www.youtube.com/watch?v=Kamld5Z-xx0][Michael Sarahan - Making packages and packaging "just work"]]
   [[https://python-packaging-tutorial.readthedocs.io/en/latest/conda.html][Guide to building `conda` packages]]
 
-** TODO Document build process in CONTRIBUTING.rst
-So it is reproducible and people can easily get the source to develop on.
-
-** TODO Remove hard-coded links in curate.py
+** DONE Remove hard-coded links in curate.py
+CLOSED: [2020-05-11 Mon 23:43]
 
 ** TODO Create CLI
 Thinking of calling the program `tbv`
@@ -183,6 +194,14 @@ Keep `curate` for running the full process
   tbv dedup [OPTIONS] filename1 ...
 #+end_src
 
+** DONE Document build process in CONTRIBUTING.rst
+CLOSED: [2020-05-11 Mon 23:59]
+So it is reproducible and people can easily get the source to develop on.
+
+** TODO Conda devlop?
+Pip has ~pip install --editable~. Conda seems to have some similar, ~conda
+develop~, but there is scant information on how it works.
+
 ** TODO Add overview documentation
 
 ** TODO Add documentation for functions in curate.py
@@ -199,6 +218,9 @@ Keep `curate` for running the full process
 - Fleshed out the CLI in tbv.py a bit, added options to hand to the ~curate~ module
   - removed hard-coded parameters from main()
 - Got package build working with ~pip~. Still worth using conda because of RDKit.
+- Got package to build using ~conda~.
+- Wrote up build process in CONTRIBUTING.rst
+- Obtained sample data for testing.
 
 ** 10 May 2020
 - GOAL: remove hard-coded links; that means filenames and output_dir in
