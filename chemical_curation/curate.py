@@ -474,17 +474,17 @@ def deduplicate_mols(mols, data_type, target, review_threshold, verbose = True):
     return dedup, for_review
 
 
-def main():
+def main(filenames, output_dir, targets):
 
-    targets = ["ic50", "ki", "kd"]
+    # targets = ["ic50", "ki", "kd"]
     output_ending = "curated"
     review_threshold = 10
-    output_dir = "/home/josh/tmp/curation_test"
+    # output_dir = "/home/josh/tmp/curation_test"
 
 
     #filenames = ["/home/josh/git/chemical_curation/test/failures.smi",
     #"/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
-    filenames = ["/home/josh/git/chemical_curation/test/failures.smi"]
+    # filenames = ["/home/josh/git/chemical_curation/test/failures.smi"]
     #filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
 
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
@@ -547,4 +547,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"],
+         output_dir = "/home/josh/tmp/curation_test",
+         targets = ["ic50", "ki", "kd"])
