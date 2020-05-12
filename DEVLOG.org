@@ -40,6 +40,105 @@ https://docs.python.org/3/library/unittest.html
 * Tasks for 0.1.0 [0/8]
 ** TODO Set up `conda-build` build process
 
+- Note taken on [2020-05-11 Mon 20:10] \\
+  Pip works just fine in the conda environment and the click/setuptools
+  integration is working well too.
+  
+  #+begin_src sh
+    pip install --editable .
+  #+end_src
+
+  One problem with not using conda is that I believe RDKit is olnly available
+  from conda-forge, so pip would have to be told where to find it.
+
+- Note taken on [2020-05-11 Mon 16:57] \\
+  This is kind of working.
+  
+  On my system (running Fedora 32), I installed conda from the RPM repo
+  
+  #+begin_src sh
+    sudo dnf install conda
+  #+end_src
+  
+  This gave me conda 4.8.2
+  
+  I set conda to install things to my $HOME directory.
+  
+  #+begin_src sh
+    conda config --prepend pkgs_dirs ~/.conda/pkgs
+    conda config --prepend envs_dirs ~/.conda/envs
+  #+end_src
+  
+  I had to create a new environment because I was getting errors when trying to
+  install packages to the base environment.
+  
+  #+begin_src sh
+    conda create --name test_env
+    conda activate test_env
+  #+end_src
+  
+  Installed ~conda-build~
+  
+  #+begin_src sh
+    conda install conda-build
+  #+end_src
+  
+  Not sure if ~-c conda-forge~ should be used for all package installs - I have
+  read a few SO answers that suggest that installing from differnet channels can
+  cuase errors.
+  
+  And then from the project root, I ran ~conda-build~
+  
+  #+begin_src sh
+    conda-build .
+  #+end_src
+  
+  This failed, complaining that "RuntimeError: Setuptools downloading is disabled
+  in conda build. Be sure to add all dependencies in the meta.yaml". I find this
+  odd, since the official documentation AND the [[https://github.com/conda/cookiecutter-conda-python][conda-cookiecutter]] template use
+  the ~install_requires~ field in setup.py. I couldn't find anything online
+  documentating a change in behavior, although I did find a few GitHub issues of
+  people experiencing similar errors and receiving no responses.
+  
+  ~Conda-build~ also wanted ~conda-verify~, so I installed that as well.
+  
+  Once I had ~conda-build~ running successfully, the next problem was ~conda
+  install~. The documentation for building a conda package says to run
+  ~conda-build~ and follow it up with
+  
+  #+begin_src sh
+    conda install --use-local package_name
+  #+end_src
+  
+  But ~conda install~ didn't give a shit where I told it to look (~-c local~ also
+  did not work), and instead looked for ~chemical_suration~ in the official
+  Anaconda repo. I finally got it installed by grabbing the install location from
+  the end of the ~conda-build~ output and using ~--offline~, which looked like
+  
+  #+begin_src sh
+    conda install --offline ~/.conda/envs/test_env/conda-bld/linux-64/chemical_curation-0.0.1-py37_0.tar.bz2
+  #+end_src
+  
+  So then I was able to use ~from chemical_curation import curate~ to import
+  everything from ~curate.py~ in a Python program. However, this didn't work at
+  first since the environment didn't have rdkit installed. I thought the build
+  process would bundle all the necessary libraries? It seems to have bundled
+  everything else.
+  
+  I'm also confused as to how to get the CLI working once a package has been
+  installed from using conda. Right now I only seem to be able to use the CLI from
+  tbv.py if I run 
+  
+  #+begin_src sh
+    python tbv.py ...
+  #+end_src
+  
+  and tbv.py includes a ~if __name__=='__main__':~ block.
+  
+  Maybe the answer for right now is to use pip instead of conda, but I feel like
+  since most people are probably using Anaconda, out package would be more
+  accessible if we published it using conda and the associated package repos.
+
 - Note taken on [2020-05-10 Sun 12:44] \\
   [[https://www.youtube.com/watch?v=Kamld5Z-xx0][Michael Sarahan - Making packages and packaging "just work"]]
   [[https://python-packaging-tutorial.readthedocs.io/en/latest/conda.html][Guide to building `conda` packages]]
@@ -52,7 +151,8 @@ So it is reproducible and people can easily get the source to develop on.
 ** TODO Create CLI
 Thinking of calling the program `tbv`
 
-*** TODO COMMENT Get first working example
+*** DONE Get first working example
+CLOSED: [2020-05-11 Mon 16:57]
 Want to have an executable that takes in a filename or list of filenames and
 executes the entire curation process as currently defined in curate.py.
 
@@ -60,7 +160,8 @@ executes the entire curation process as currently defined in curate.py.
   tbv curate filename1 filename2 ...
 #+end_src
 
-*** TODO Add option to specify output location
+*** DONE Add option to specify output location
+CLOSED: [2020-05-11 Mon 16:57]
 #+begin_src sh
   tbv curate -o output_dir filename1 filename2
 #+end_src
@@ -91,6 +192,14 @@ Keep `curate` for running the full process
 ** TODO Add tests for modules
 
 * Log
+
+** 11 May 2020
+- Fought with ~conda-build~ for a while; findings documented under the
+  conda-build TODO above
+- Fleshed out the CLI in tbv.py a bit, added options to hand to the ~curate~ module
+  - removed hard-coded parameters from main()
+- Got package build working with ~pip~. Still worth using conda because of RDKit.
+
 ** 10 May 2020
 - GOAL: remove hard-coded links; that means filenames and output_dir in
   ~main()~ - potentially targets as well?
