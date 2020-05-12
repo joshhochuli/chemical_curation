@@ -1,22 +1,24 @@
-from setuptools import setup, find_packages()
+from setuptools import setup
+
+requirements = [
+    "Click",
+    "Pandas",
+    # "RDKit",
+    "MolVS",
+    "Sphinx"
+]
 
 setup(
     name="ChemicalCuration",
     version="0.0.1",
-    description="Library providing functions for curating chemical data according to the Trust But Verify process."
+    description="Library providing functions for curating chemical data according to the Trust But Verify process.",
 
-    packages=find_packages(),
-    include_package_data=True,
-    install_requires=["click",
-                      "sphinx",
-                      "rdkit",
-                      "molvs",
-                      "pandas",
-                      "unittest"
-                      ],
-
-    entry_points="""
-    [console_scripts]
-    chemical_curation=tbv:main
-    """ 
+    packages=['chemical_curation'],
+    
+    install_requires=requirements,
+    entry_points={
+        "console_scripts": [
+            "tbv = chemical_curation.tbv:cli"
+        ]
+    }
 )
