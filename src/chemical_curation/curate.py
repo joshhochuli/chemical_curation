@@ -18,6 +18,8 @@ import math #for rounding
 
 import pandas
 
+import logging
+
 #list of atoms allowed for dragon descriptor calculatoin
 dragon_allowed_atoms = set(["H","B","C","N","O","F","Al","Si","P","S","Cl","Cr",
     "Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Mo","Ag","Cd","In",
@@ -111,11 +113,11 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
     to_remove = []
     for activity_field, hits in activity_hits.items():
         if len(hits) == 0:
-            print(f"Supplied activity field name '{activity_field}' not found in dataframe. Skipping.")
+            logging.warning(f"Supplied activity field name '{activity_field}' not found in dataframe. Skipping.")
             to_remove.append(activity_field)
             continue
         if len(hits) > 1:
-            print(f"Supplied activity field name '{activity_field}' is a substring of multiple fields.\n Hits: {activity_hits}\n Exiting.")
+            logging.warning(f"Supplied activity field name '{activity_field}' is a substring of multiple fields.\n Hits: {activity_hits}\n Exiting.")
             exit()
         else:
             activity_hits[activity_field] = hits[0]
@@ -125,13 +127,13 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
             activity_hits.pop(item)
 
     if len(mol_hits) == 0:
-        print(f"Supplied molecule field name '{mol_field}' not found in dataframe. Exiting.")
+        logging.warning(f"Supplied molecule field name '{mol_field}' not found in dataframe. Exiting.")
         exit()
     if len(mol_hits) > 1:
-        print(f"Supplied molecule field name '{mol_field}' is a substring of multiple fields.\n Hits: {mol_hits}\n Exiting.")
+        logging.warning(f"Supplied molecule field name '{mol_field}' is a substring of multiple fields.\n Hits: {mol_hits}\n Exiting.")
         exit()
     else: 
-        print(f"Molecule field found: {mol_hits[0]}")
+        logging.info(f"Molecule field found: {mol_hits[0]}")
         mol_name = mol_hits[0]
 
     for_review = {}
@@ -268,7 +270,7 @@ def process_mol(mol):
     fragmenter_object = molvs.fragment.LargestFragmentChooser(prefer_organic = True)
     mol = fragmenter_object.choose(mol)
     if mol is None:
-        print("Mixture removal failed for molecule")
+        logging.info("Mixture removal failed for molecule")
 
     #removal of inorganics
     if not molvs.fragment.is_organic(mol):
@@ -357,7 +359,7 @@ def get_mols_from_files(filenames, targets, verbose = True):
 
         for target in targets:
             t = [x for x in mols if x.has_activity(target)]
-            print(f"{filename} {target} hits: {len(t)}")
+            logging.debug(f"{filename} {target} hits: {len(t)}")
 
         all_mols.extend(mols)
         extend_dict(all_for_review, for_review)
@@ -463,35 +465,37 @@ def deduplicate_mols(mols, data_type, target, review_threshold, verbose = True):
             else:
                 dedup[key] = value[0]
 
-    if verbose:
-
-        print(f"Length before deduplication: {len(mols)}")
-        print(f"Length after deduplication: {len(dedup)}")
-        print(f"Total removed: {total_removed}")
+    logging.info(f"Length before deduplication: {len(mols)}")
+    logging.info(f"Length after deduplication: {len(dedup)}")
+    logging.info(f"Total removed: {total_removed}")
     
-        if data_type == "precise":
-            print(f"{multiple_same_count} molecules with exact duplicate activities found")
-            print(f"{multiple_diff_count} molecules with different activities found and averaged")
-            print(f"{review_count} molecules with value differing by more than a factor of {review_threshold} and flagged for review")
-        elif data_type == "imprecise":
-            print(f"{multiple_same_count} molecules with exact duplicate activities found")
-            print(f"{review_count} molecules with different values flagged for review")
+    if data_type == "precise":
+        logging.info(f"{multiple_same_count} molecules with exact duplicate activities found")
+        logging.info(f"{multiple_diff_count} molecules with different activities found and averaged")
+        logging.info(f"{review_count} molecules with value differing by more than a factor of {review_threshold} and flagged for review")
+    elif data_type == "imprecise":
+        logging.info(f"{multiple_same_count} molecules with exact duplicate activities found")
+        logging.info(f"{review_count} molecules with different values flagged for review")
 
     return dedup, for_review
 
 
-def main(filenames, output_dir, targets):
+def create_logger(verbosity, logfile=None):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(verbosity)
 
-    # targets = ["ic50", "ki", "kd"]
+
+def main(filenames, output_dir, targets, review_threshold, verbosity):
+
+    int_log_level = getattr(logging, verbosity.upper())
+    if not isinstance(int_log_level, int):
+        raise ValueError('Invalid log level: %s' % int_log_level)
+    logging.basicConfig(level=int_log_level)
+
+    logging.debug(f'Beginning curation for {len(filenames)} files.')
+    logging.debug(f'Sending results to {output_dir}')
+
     output_ending = "curated"
-    review_threshold = 10
-    # output_dir = "/home/josh/tmp/curation_test"
-
-
-    #filenames = ["/home/josh/git/chemical_curation/test/failures.smi",
-    #"/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
-    # filenames = ["/home/josh/git/chemical_curation/test/failures.smi"]
-    #filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
 
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
 
@@ -555,4 +559,11 @@ def main(filenames, output_dir, targets):
 if __name__ == "__main__":
     main(filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"],
          output_dir = "/home/josh/tmp/curation_test",
-         targets = ["ic50", "ki", "kd"])
+         targets = ["ic50", "ki", "kd"],
+         review_threshold=10,
+         verbosity='INFO')
+
+    #filenames = ["/home/josh/git/chemical_curation/test/failures.smi",
+    #"/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
+    # filenames = ["/home/josh/git/chemical_curation/test/failures.smi"]
+    #filenames = ["/home/josh/git/cdk9_design/data/uncleaned/sdf/chembl_cdk9.sdf"]
