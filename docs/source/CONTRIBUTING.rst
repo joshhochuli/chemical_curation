@@ -7,7 +7,8 @@ CONTRIBUTING
 Getting Setup
 ------------
 
-This section will get you set up with the conda build process.
+This section will get you set up with the code in devlopment mode so you can
+easily make and test changes.
 
 1. Fork the `chemical_curation` repo on GitHub.
 2. Clone your fork locally::
@@ -16,22 +17,13 @@ This section will get you set up with the conda build process.
 
 3. Install `conda <https://docs.conda.io/projects/conda/en/latest/user-guide/install/>` if you
    do not already have it.
-4. Create a new conda environment and install conda-build and conda-verify::
+4. Create an environment using the `environment.yaml` file in this repo. This
+   will create a virtual environment named "chemical_curation"::
 
-     $ conda create --name tbv_dev conda-build conda-verify
-     $ conda activate tbv_dev
+     $ conda env create -f environment.yaml
+     $ conda activate chemical_curation
 
-5. The project can now be built locally using::
-
-     $ conda-build -c conda-forge .
-
-6. Near the end of the conda-build output, there should a line that says "TEST
-   END: " with the location of the package. Copy the path up to the last
-   directory name (so if the full output is TEST END: /path/to/pkg/pkg.tar.bz2,
-   copy /big/to/pkg/). Use this directory as the channel for conda install::
-
-     $ conda install -c /path/to/pkg/ chemical_curation
-
-   You should now be able to import modules from the package, as long as you are
-   in the conda environment where you built it.
-     
+5. Run `pip install --editable .` to install the package in development mode;
+   this means that changes you make to the code will be automatically applied to
+   your local version of the package so that you don't have to reinstall after
+   every change.   

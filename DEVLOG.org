@@ -194,6 +194,11 @@ Keep `curate` for running the full process
   tbv dedup [OPTIONS] filename1 ...
 #+end_src
 
+** TODO Logging
+By default, log to stdout. Allow configuration of logger in code so it can be
+controlled from a Jupyter notebook. Add --logfile option and --log-level option
+to cli.
+
 ** DONE Document build process in CONTRIBUTING.rst
 CLOSED: [2020-05-11 Mon 23:59]
 So it is reproducible and people can easily get the source to develop on.
@@ -221,12 +226,30 @@ develop~, but there is scant information on how it works.
 
 * Log
 
+** 16 May 2020
+- Was a bit hasty reaching for ~conda-build~ and wound up confused. All we
+  really need is a virtual environment and ~pip install --editable .~
+  - created a simple environment.yaml file
+  - updated CONTRIBUTING.rst
+- Added smoke test for the testing module in tests/__init__.py
+
+** 13 May 2020 
+- Add logging module to curate and tbv modules; verbosity flag to tbv.py
+  - info on how to do logging in python found [[https://docs.python.org/3/howto/logging.html][here]].
+- Use [[https://tox.readthedocs.io/en/latest/][tox]] and [[https://github.com/tox-dev/tox-conda][tox-conda]] for testing? Getting the testing right with conda-build
+  seems to be a bit fickle.
+
 ** 12 May 2020
 - Switched to src/package/modules structure for a better time with testing, as
   recommended in [[https://blog.ionelmc.ro/2014/05/25/python-packaging/#the-structure][this article]] linked from the PyTest documentation
   - moved package directory to src/
   - updated setup.py to reflect changes
 - Looked into conda develop, looks like a no-go.
+- Tried running ~tbv curate~ against the test data from Vini. None of them were
+  able to execute, although interestingly, running ~tbv curate~ with no
+  arguments DID run, and produced a directory called 'None' with the correct
+  empty folders. Should we run checks on the passed files?
+- review_threshold hardcoded -> parameter
 
 ** 11 May 2020
 - Fought with ~conda-build~ for a while; findings documented under the
