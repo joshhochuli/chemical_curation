@@ -230,9 +230,25 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
 
 #if shared keys, form a list 
 def extend_dict(a, b):
+    """
+    Absorb dict /b/ into dict /a/.
+
+    Take in two dict objects /a/ and /b/. For each item in /b/, check if the
+    item's key is in /a/. 
+
+    If yes, then append the item's value to the value for that key in /a/
+    (assumed to be a list). 
+
+    If no, create the item in /a/.
+
+    This operation is done in place.
+    """
 
     for key, value in b.items():
         if key in a:
+            # why do we not need to check the type of /value/ here but we do below?
+            # couldn't we end up with a[key] = [x, y, [value]] ?
+            # also why not just enforce that /value/ is a list at creation?
             a[key].append(value)
         else:
             if isinstance(value, list):
