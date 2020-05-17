@@ -325,6 +325,15 @@ def imprecise_strings_equal(s1, s2):
     return True
 
 def get_mols_from_files(filenames, targets, verbose = True):
+    """
+    Read each file into its own Pandas dataframe. File type is based on the file
+    extension. Currently supported filetypes are .sdf, .smi, .csv, and .tsv.
+
+    For each file, extract the mols, stats, and the molecules that require review.
+
+    Bring cleaned mols from all files into one list, /all_mols/, and all mols
+    requiring review into one dict, /all_for_review/.
+    """
 
     all_for_review = {}
     all_mols = []
@@ -332,11 +341,12 @@ def get_mols_from_files(filenames, targets, verbose = True):
     for filename in filenames:
         logging.info(filename)
 
-        # determine the type of the filename by the extension
+        # Determine the type of the filename by the extension
         file_ext = pathlib.Path(filename).suffix
-        ## mol_field should probably be a passable agument?
+        ## Mol_field should probably be a passable agument, defaulting to "mol"?
         mol_field = "mol"
-        
+
+        # Read file depending on file extension
         if file_ext == ".sdf":
             df = PandasTools.LoadSDF(filename, molColName = mol_field)
         elif file_ext in [".csv", ".tsv", ".smi"]:
@@ -350,18 +360,25 @@ def get_mols_from_files(filenames, targets, verbose = True):
             # TODO Throw an error
             pass
 
-        
+        # Stats is never used?
         mols, stats, for_review = get_activities(df, original_filename = filename,
                                                  activity_fields = targets,
                                                  mol_field = mol_field)
 
+        # Report the number of mols with activity for each target
         for target in targets:
+            # We iterate over all the mols A LOT. Can that be reduced at all?
+            # Also why did we make and return the /stats/ dict if we were just going to count
+            # the stuff in /mols/ to get the same info???
             t = [x for x in mols if x.has_activity(target)]
             logging.info(f"{filename} {target} hits: {len(t)}")
 
+        # Add the mols from the file to the list of all mols    
         all_mols.extend(mols)
+        # Add the mols that require review from this file to the dict of all mols requiring review
         extend_dict(all_for_review, for_review)
 
+    # Return the list of /all_mols/ that have at least one valid activity and the mols that need to be reviewed
     return all_mols, all_for_review
 
 def get_unique_mols(mols, data_type, target):
@@ -491,8 +508,10 @@ def main(filenames, output_dir, targets, review_threshold, verbosity):
 
     output_ending = "curated"
 
+    # aggregation
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
 
+    # deduplication, done by target
     for target in targets:
         logging.info(f"\nDeduplicating {target}")
 
