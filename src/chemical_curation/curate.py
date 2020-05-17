@@ -97,20 +97,49 @@ class ManualReviewException(Exception):
 #needs original filename for manual review cases
 #parses dataframe for mols with desired activities
 def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
-    
+    """
+    Find the columns for the mol and each target; if more than one column for
+    any of these, we have a problem and we quit.
+
+    Filters the df to get only rows that have a valid activity value for at least
+    one target. Finds the activities (separated into 'precise' and 'imprecise') for
+    each molecule.
+
+    Return a list of Mol objects and a list of molecules that require manual review.
+
+    """
+
+    # why is /targets/ renamed to /activity_fields/?
+
+    # for each target, look through the columns of the passed dataframe and see
+    # if any of them contain the target
+    # make a dict with the targets as the keys and a list of all column names
+    # containing that target as the items.
+    # Could rewrite as:
+    ## activity_hits = {target:[] for target in activity_fields}
+    ## for target in activity_hits:
+    ##     activity_hits[target] = [col for col in df.columns if target.lower() in col.lower()]
+        
     activity_hits = {}
     for activity_field in activity_fields:
         activity_hits[activity_field] = []
         for col_name in df.columns:
             if activity_field.lower() in col_name.lower():
+                # why is this check necessary, didn't we just put it in activity hits 3 lines ago
                 if activity_field in activity_hits:
                     activity_hits[activity_field].append(col_name)
 
+    # look through the columns again, this time looking to see if they contain the mol_field string
+    # Should this require equality, not containment, and then we just tell them to pass the full name
+    # of the mol column, with the default being "mol"?
+    ## mol_hits = [col in df.columns if col.lower().contains(mol_field.lower())]
     mol_hits = []
     for col_name in df.columns:
         if mol_field.lower() in col_name.lower():
             mol_hits.append(col_name)
 
+    # remove the targets that we couldn't find a column for.
+    # If we find multiple possible columns for a target, give up.
     to_remove = []
     for activity_field, hits in activity_hits.items():
         if len(hits) == 0:
@@ -119,14 +148,18 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
             continue
         if len(hits) > 1:
             logging.warning(f"Supplied activity field name '{activity_field}' is a substring of multiple fields.\n Hits: {activity_hits}\n Exiting.")
+            # I don't think exit() is what we want here.
             exit()
         else:
             activity_hits[activity_field] = hits[0]
             print(f"Activity field found: {activity_hits[activity_field]}")
 
     for item in to_remove:
-            activity_hits.pop(item)
+        # why not just remove it when you found it???
+        activity_hits.pop(item)
 
+    # If we find zero or many columns with the mol_field string, give up.
+    # Otherwise, select the one column we found.
     if len(mol_hits) == 0:
         logging.warning(f"Supplied molecule field name '{mol_field}' not found in dataframe. Exiting.")
         exit()
@@ -142,15 +175,27 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
     #get set of all rows with valid entries of any activity
     valid_cols = []
 
-    for activity_name, df_activity_name in activity_hits.items():
-
+    # For each target, get a Series obj /u/ of length of df with True if the cell
+    # contents at that position is not equal to ''
+    # For each target, get a Series obj /v/ of length of df with True if the cell
+    # contents at that position are not NaN
+    # Take the logical AND of the two Series, which is a new Series /valid/
+    # Append /valid/ to a list
+    # Do we deal with converting datasets that may have been loaded with 'nan' or other common NaN pitfalls?
+    for activity_name, df_activity_name in activity_hits.items():        
         #check for empty and null
+        # True if not empty, False if empty string
         u = df[df_activity_name] != ''
+        # True if not null, False if null
         v = pandas.notnull(df[df_activity_name])
         valid = (u & v)
         valid_cols.append(u & v)
 
     #find rows without any valid activities and report
+
+    # Find the logical OR of the boolean Series for all the target columns
+    # Get the rows from the df that are still False at the end
+    # Report them
     final = valid_cols[0]
     for v in valid_cols[1:]:
         final = final | v
@@ -165,21 +210,38 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
             else:
                 for_review["input_files"].append(s)
 
-
+    # Get the rows from the df that had at least one True in the composite boolean Series
     trimmed_df = df[final]
 
+    
     mols = []
+    # /stats/ keeps track of the count of the number of mols with 'precise' and
+    # 'imprecise' activities for each target
+    # Initialize so that we don't have to do the checking below?
+    ## stats = {target:{'precise':0, 'imprecise':0} for target in activity_hits}
+    # or, why not reuse /activity_hits/?
     stats = {}
 
+    # DON'T USE ITERROWS
     for i, row in trimmed_df.iterrows():
+        # only used for error messages
         actual_row = i + 2 #index by one, account for header
+        # /mol_name/ is the column that we found to contain the mols
         original_mol = row[mol_name]
 
+        # Then for each mol we have a dict of precise and imprecise activities that we find
         precise = {}
         imprecise = {}
+        
+        # For each target, we again check that this row has a valid entry
+        # Do we even need to do the valid checking above then? Won't an invalid
+        # item just drop through this check
         for activity_name, df_activity_name in activity_hits.items():
             if pandas.notnull(row[df_activity_name]) and row[df_activity_name] != '':
                 val = row[df_activity_name]
+                # What kind of values are we expecting to see for 'imprecise' activities?
+                # If it were a boolean represented as 1 or 0, that would still be considered
+                # 'precise' by this conversion
                 try:
                     val = float(val)
                     precise[activity_name] = val
@@ -200,13 +262,24 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
                     else:
                         stats[activity_name]['imprecise'] += 1
 
+        # Is this conditional why mol_field wasn't a passed parameter?
+        # I think there is probably a different way to deal with this (maybe look
+        # at the type of the contents of the mol column?)
 
+        # Create a Mol obj (our obj, not an rdkit Mol obj) from the mol_string
+        # If creating the mol fails, add the info to the /for_review/ dict
         if mol_field == "mol":
             try:
-                mol = Mol.from_mol_string(precise_activities = precise, imprecise_activities = imprecise, mol_string = Chem.MolToMolBlock(original_mol))
+                # rdkit.Chem.MolToMolBlock: creates an MDL molblock as a string
+                # Does this deal with all the cases we may encounter?
+                # Why do we do this conversion?
+                mol = Mol.from_mol_string(precise_activities = precise,
+                                          imprecise_activities = imprecise,
+                                          mol_string = Chem.MolToMolBlock(original_mol))
                 mols.append(mol)
             except Exception as e:
                 s = f"{original_filename}, row {actual_row}, {str(e)}"
+                # stop doing this; initialize the dict with the keys and an empty list as the item for each
                 if activity_name in for_review:
                     for_review[activity_name].append(s)
                 else:
@@ -225,7 +298,8 @@ def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
                 else:
                     for_review[activity_name] = [s]
                 continue
-
+            
+    # Return /mols/ (list), /stats/ (dict), /for_review/ (dict)
     return mols, stats, for_review
 
 #if shared keys, form a list 

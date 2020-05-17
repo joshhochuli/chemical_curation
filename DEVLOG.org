@@ -226,6 +226,33 @@ develop~, but there is scant information on how it works.
 
 * Log
 
+** 17 May 2020
+- Doesn't make sense with flow of curate.py to have cli set up with subcommands;
+  simplified to just one command.
+- Mixed up logging info/debug levels in some places; fixed
+- Cleaned up curate.get_mols_from_files()
+- Heavily commented curate.get_activities() so I know how it works.
+  - Was there an unstated goal to use the Pandas API as little as possible? Why
+    even load the files into dataframes if we are just going to take all the
+    info out and place it into dicts and lists, AND do it by operating on each
+    row individually???
+  - I am confused by the definitions of 'precise' and 'imprecise' activities. in
+    the code, an activity value is 'precise' if it can be converted to a
+    float. This implies that a categorical activity value (such as '1 for
+    active, 0 for inactive') would be considered as a 'precise' value. It also
+    seems that a target can have both 'precise' and 'imprecise' activities. How
+    does this work?
+  - We need to enforce,either in the code or in the documentation, some format
+    for the passed dataset. For example, a lot of datasets will have a bunch of
+    header info - either we try to deal with this, or we tell the user we can't
+    deal with it, or we give them more access to the Pandas api that we are
+    using to load their dataset by allowing them to pass arguments like
+    /header/.
+  - How could you ever hope to write full-coverage tests for this function? I
+    think this one function does too much.
+  - Overall, I think we need to write out what this function is supposed to do
+    and then restructure it to appropriately meet those goals.
+
 ** 16 May 2020
 - Was a bit hasty reaching for ~conda-build~ and wound up confused. All we
   really need is a virtual environment and ~pip install --editable .~
