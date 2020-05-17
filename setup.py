@@ -19,7 +19,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "tbv = chemical_curation.tbv:cli"
+            "tbv = chemical_curation.tbv:cli_curate"
         ]
     }
 )
