@@ -19,6 +19,7 @@ import math #for rounding
 import pandas
 
 import logging
+import pathlib
 
 #list of atoms allowed for dragon descriptor calculatoin
 dragon_allowed_atoms = set(["H","B","C","N","O","F","Al","Si","P","S","Cl","Cr",
@@ -96,7 +97,7 @@ class ManualReviewException(Exception):
 #needs original filename for manual review cases
 #parses dataframe for mols with desired activities
 def get_activities(df, original_filename, activity_fields, mol_field = "mol"):
-
+    
     activity_hits = {}
     for activity_field in activity_fields:
         activity_hits[activity_field] = []
@@ -329,37 +330,34 @@ def get_mols_from_files(filenames, targets, verbose = True):
     all_mols = []
 
     for filename in filenames:
-        print(filename)
+        logging.info(filename)
 
-        if ".sdf" in filename:
-            df = PandasTools.LoadSDF(filename, molColName = "mol")
-            mols, stats, for_review = get_activities(df,
-                                                     original_filename = filename,
-                                                     activity_fields = targets)
-
-        elif ".csv" in filename or ".tsv" in filename:
-            if ".csv" in filename:
-                sep = ","
-            if ".tsv" in filename:
+        # determine the type of the filename by the extension
+        file_ext = pathlib.Path(filename).suffix
+        ## mol_field should probably be a passable agument?
+        mol_field = "mol"
+        
+        if file_ext == ".sdf":
+            df = PandasTools.LoadSDF(filename, molColName = mol_field)
+        elif file_ext in [".csv", ".tsv", ".smi"]:
+            sep = ","
+            if file_ext == ".tsv":
                 sep = "\t"
-
-            print(sep)
-
+            if file_ext == ".smi":
+                mol_field = "smiles"
             df = pandas.read_csv(filename, sep = sep)
+        else:
+            # TODO Throw an error
+            pass
 
-            mols, stats, for_review = get_activities(df, original_filename = filename, activity_fields = targets)
-
-        elif ".smi" in filename:
-
-            df = pandas.read_csv(filename, sep = ",")
-            print(df)
-
-            mols, stats, for_review = get_activities(df, original_filename =
-                    filename, activity_fields = targets, mol_field = "smiles")
+        
+        mols, stats, for_review = get_activities(df, original_filename = filename,
+                                                 activity_fields = targets,
+                                                 mol_field = mol_field)
 
         for target in targets:
             t = [x for x in mols if x.has_activity(target)]
-            logging.debug(f"{filename} {target} hits: {len(t)}")
+            logging.info(f"{filename} {target} hits: {len(t)}")
 
         all_mols.extend(mols)
         extend_dict(all_for_review, for_review)
@@ -465,42 +463,38 @@ def deduplicate_mols(mols, data_type, target, review_threshold, verbose = True):
             else:
                 dedup[key] = value[0]
 
-    logging.info(f"Length before deduplication: {len(mols)}")
-    logging.info(f"Length after deduplication: {len(dedup)}")
-    logging.info(f"Total removed: {total_removed}")
+    logging.debug(f"Length before deduplication: {len(mols)}")
+    logging.debug(f"Length after deduplication: {len(dedup)}")
+    logging.debug(f"Total removed: {total_removed}")
     
     if data_type == "precise":
-        logging.info(f"{multiple_same_count} molecules with exact duplicate activities found")
-        logging.info(f"{multiple_diff_count} molecules with different activities found and averaged")
-        logging.info(f"{review_count} molecules with value differing by more than a factor of {review_threshold} and flagged for review")
+        logging.debug(f"{multiple_same_count} molecules with exact duplicate activities found")
+        logging.debug(f"{multiple_diff_count} molecules with different activities found and averaged")
+        logging.debug(f"{review_count} molecules with value differing by more than a factor of {review_threshold} and flagged for review")
     elif data_type == "imprecise":
-        logging.info(f"{multiple_same_count} molecules with exact duplicate activities found")
-        logging.info(f"{review_count} molecules with different values flagged for review")
+        logging.debug(f"{multiple_same_count} molecules with exact duplicate activities found")
+        logging.debug(f"{review_count} molecules with different values flagged for review")
 
     return dedup, for_review
 
 
-def create_logger(verbosity, logfile=None):
-    logger = logging.getLogger(__name__)
-    logger.setLevel(verbosity)
-
-
 def main(filenames, output_dir, targets, review_threshold, verbosity):
 
+    # define logger
     int_log_level = getattr(logging, verbosity.upper())
     if not isinstance(int_log_level, int):
         raise ValueError('Invalid log level: %s' % int_log_level)
     logging.basicConfig(level=int_log_level)
 
-    logging.debug(f'Beginning curation for {len(filenames)} files.')
-    logging.debug(f'Sending results to {output_dir}')
+    logging.info(f'Beginning curation for {len(filenames)} files.')
+    logging.info(f'Sending results to {output_dir}')
 
     output_ending = "curated"
 
     all_mols, all_for_review = get_mols_from_files(filenames, targets)
 
     for target in targets:
-        print(f"\nDeduplicating {target}")
+        logging.info(f"\nDeduplicating {target}")
 
         precise_mols = [x for x in all_mols if x.has_precise_activity(target)]
         imprecise_mols = [x for x in all_mols if x.has_imprecise_activity(target)]
