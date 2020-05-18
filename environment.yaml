@@ -1,0 +1,11 @@
+name: chemical_curation
+channels:
+    - conda-forge
+dependencies:
+    - python=3.7 # for now
+    - click # used to create the CLI tbv
+    - sphinx # used to create documentation
+    - molvs # used in standardizing chemical structures
+    - rdkit # does a lot of the heavy lifting to convert mol representations into something we can work with
+    - pandas # used for most data manipulation
+    - pip # used during the development process

@@ -1,0 +1,320 @@
+* Project Goals
+As stated in the README, the curation process has five steps:
+1. data aggregation
+2. sanitization - removal of mixtures, inorganic compounds, and salts
+3. standardization of structures
+4. removal of duplicates
+5. manual review
+
+Want to make a program that is modular, so that you can load just the structure
+standardization piece (for example) and work with that in a Jupyter
+notebook. Need to repackage for this.
+
+Also want to bundle a commandline interface that will take in a file or a list
+of files are perform all steps end-to-end, outputting the cleaned results and a
+list of compounds requiring manual review.
+
+Want to support a good range of file types.
+
+Definitely need to have good test coverage for a project like this.
+
+* Flow of current program
+
+* Dependencies
+Libraries used in this project:
+- The [[https://www.rdkit.org/docs/GettingStartedInPython.html][RDKit]], an open-source toolkit for cheminformatics.
+- [[https://molvs.readthedocs.io/en/latest/][MolVS]], a molecule validation and standardization tool built using RDKit
+- [[https://pandas.pydata.org/docs/][Pandas]], for the majority of the dataset manipulation
+- [[https://click.palletsprojects.com/en/7.x/][Click]], the "command line interface creation kit", for creating the cli tool
+- [[https://www.sphinx-doc.org/en/master/][Sphinx]], a tool for creating documentation
+
+Dependencies are handled by [[https://setuptools.readthedocs.io/en/latest/setuptools.html#basic-use][Setuptools]]. Built and managed with [[https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html][conda]].
+
+Project structure in line with official Python recommendations found [[https://packaging.python.org/overview/#][here]] and
+[[https://docs.python-guide.org/writing/structure/#setup-py][here]].
+
+Test info coming soon.
+https://docs.python-guide.org/writing/tests/
+https://docs.python.org/3/library/unittest.html
+
+* Tasks for 0.1.0 [4/9]
+** DONE Set up `conda-build` build process
+CLOSED: [2020-05-11 Mon 23:04]
+
+- Note taken on [2020-05-11 Mon 23:03] \\
+  It works! I don't know why, but conda-build and conda-install are now working.
+  Steps taken:
+  + added "conda-forge" and "local" to channels in .condarc. Don't know if this
+    one actually made a difference.
+  + set channel_priority to strict in .condarc. Pretty sure this didn't change
+    anything either.
+  + commented out "rdkit" and "molvs" in setup.py. I think what happends is
+    these packages are only found in conda-forge and somehow conda and
+    setuptools are not syncing up when they look for the packages and so conda
+    thinks setuptools is trying to install something else.
+
+- Note taken on [2020-05-11 Mon 20:10] \\
+  Pip works just fine in the conda environment and the click/setuptools
+  integration is working well too.
+  
+  #+begin_src sh
+    pip install --editable .
+  #+end_src
+
+  One problem with not using conda is that I believe RDKit is olnly available
+  from conda-forge, so pip would have to be told where to find it.
+
+- Note taken on [2020-05-11 Mon 16:57] \\
+  This is kind of working.
+  
+  On my system (running Fedora 32), I installed conda from the RPM repo
+  
+  #+begin_src sh
+    sudo dnf install conda
+  #+end_src
+  
+  This gave me conda 4.8.2
+  
+  I set conda to install things to my $HOME directory.
+  
+  #+begin_src sh
+    conda config --prepend pkgs_dirs ~/.conda/pkgs
+    conda config --prepend envs_dirs ~/.conda/envs
+  #+end_src
+  
+  I had to create a new environment because I was getting errors when trying to
+  install packages to the base environment.
+  
+  #+begin_src sh
+    conda create --name test_env
+    conda activate test_env
+  #+end_src
+  
+  Installed ~conda-build~
+  
+  #+begin_src sh
+    conda install conda-build
+  #+end_src
+  
+  Not sure if ~-c conda-forge~ should be used for all package installs - I have
+  read a few SO answers that suggest that installing from differnet channels can
+  cuase errors.
+  
+  And then from the project root, I ran ~conda-build~
+  
+  #+begin_src sh
+    conda-build .
+  #+end_src
+  
+  This failed, complaining that "RuntimeError: Setuptools downloading is disabled
+  in conda build. Be sure to add all dependencies in the meta.yaml". I find this
+  odd, since the official documentation AND the [[https://github.com/conda/cookiecutter-conda-python][conda-cookiecutter]] template use
+  the ~install_requires~ field in setup.py. I couldn't find anything online
+  documentating a change in behavior, although I did find a few GitHub issues of
+  people experiencing similar errors and receiving no responses.
+  
+  ~Conda-build~ also wanted ~conda-verify~, so I installed that as well.
+  
+  Once I had ~conda-build~ running successfully, the next problem was ~conda
+  install~. The documentation for building a conda package says to run
+  ~conda-build~ and follow it up with
+  
+  #+begin_src sh
+    conda install --use-local package_name
+  #+end_src
+  
+  But ~conda install~ didn't give a shit where I told it to look (~-c local~ also
+  did not work), and instead looked for ~chemical_suration~ in the official
+  Anaconda repo. I finally got it installed by grabbing the install location from
+  the end of the ~conda-build~ output and using ~--offline~, which looked like
+  
+  #+begin_src sh
+    conda install --offline ~/.conda/envs/test_env/conda-bld/linux-64/chemical_curation-0.0.1-py37_0.tar.bz2
+  #+end_src
+  
+  So then I was able to use ~from chemical_curation import curate~ to import
+  everything from ~curate.py~ in a Python program. However, this didn't work at
+  first since the environment didn't have rdkit installed. I thought the build
+  process would bundle all the necessary libraries? It seems to have bundled
+  everything else.
+  
+  I'm also confused as to how to get the CLI working once a package has been
+  installed from using conda. Right now I only seem to be able to use the CLI from
+  tbv.py if I run 
+  
+  #+begin_src sh
+    python tbv.py ...
+  #+end_src
+  
+  and tbv.py includes a ~if __name__=='__main__':~ block.
+  
+  Maybe the answer for right now is to use pip instead of conda, but I feel like
+  since most people are probably using Anaconda, out package would be more
+  accessible if we published it using conda and the associated package repos.
+
+- Note taken on [2020-05-10 Sun 12:44] \\
+  [[https://www.youtube.com/watch?v=Kamld5Z-xx0][Michael Sarahan - Making packages and packaging "just work"]]
+  [[https://python-packaging-tutorial.readthedocs.io/en/latest/conda.html][Guide to building `conda` packages]]
+
+** DONE Remove hard-coded links in curate.py
+CLOSED: [2020-05-11 Mon 23:43]
+
+** TODO Create CLI
+Thinking of calling the program `tbv`
+
+*** DONE Get first working example
+CLOSED: [2020-05-11 Mon 16:57]
+Want to have an executable that takes in a filename or list of filenames and
+executes the entire curation process as currently defined in curate.py.
+
+#+begin_src sh
+  tbv curate filename1 filename2 ...
+#+end_src
+
+*** DONE Add option to specify output location
+CLOSED: [2020-05-11 Mon 16:57]
+#+begin_src sh
+  tbv curate -o output_dir filename1 filename2
+#+end_src
+
+*** TODO Add `verbose` options
+How much logging do we output about what is going on?
+
+#+begin_src sh
+  tbv curate -v -o output_dir filename1 filename2
+#+end_src
+
+*** TODO Add commands for each module
+Keep `curate` for running the full process
+
+#+begin_src sh
+  tbv curate [OPTIONS] filename1 filename2 ...
+  tbv sanitize [OPTIONS] filename1 ...
+  tbv standardize [OPTIONS] filename1 ...
+  tbv dedup [OPTIONS] filename1 ...
+#+end_src
+
+** TODO Logging
+By default, log to stdout. Allow configuration of logger in code so it can be
+controlled from a Jupyter notebook. Add --logfile option and --log-level option
+to cli.
+
+** DONE Document build process in CONTRIBUTING.rst
+CLOSED: [2020-05-11 Mon 23:59]
+So it is reproducible and people can easily get the source to develop on.
+
+** DONE Conda develop?
+CLOSED: [2020-05-12 Tue 11:22]
+- Note taken on [2020-05-12 Tue 10:52] \\
+  Apparently the answer is to use ~pip install --editable~, as ~conda develop~
+  is not maintained and not documented. But pip can't deal with the dependecnies
+  from conda-forge, I don't think. So we're left with the slower and more
+  confusing process of conda-build and conda-install.
+
+Pip has ~pip install --editable~. Conda seems to have some similar, ~conda
+develop~, but there is scant information on how it works.
+
+** TODO Add overview documentation
+
+** TODO Add documentation for functions in curate.py
+
+** TODO Refactor curate.py into individual modules
+
+** TODO Add tests for modules
+
+*** TODO Create testing setup
+
+* Log
+
+** 17 May 2020
+- Doesn't make sense with flow of curate.py to have cli set up with subcommands;
+  simplified to just one command.
+- Mixed up logging info/debug levels in some places; fixed
+- Cleaned up curate.get_mols_from_files()
+- Heavily commented curate.get_activities() so I know how it works.
+  - Was there an unstated goal to use the Pandas API as little as possible? Why
+    even load the files into dataframes if we are just going to take all the
+    info out and place it into dicts and lists, AND do it by operating on each
+    row individually???
+  - I am confused by the definitions of 'precise' and 'imprecise' activities. in
+    the code, an activity value is 'precise' if it can be converted to a
+    float. This implies that a categorical activity value (such as '1 for
+    active, 0 for inactive') would be considered as a 'precise' value. It also
+    seems that a target can have both 'precise' and 'imprecise' activities. How
+    does this work?
+  - We need to enforce,either in the code or in the documentation, some format
+    for the passed dataset. For example, a lot of datasets will have a bunch of
+    header info - either we try to deal with this, or we tell the user we can't
+    deal with it, or we give them more access to the Pandas api that we are
+    using to load their dataset by allowing them to pass arguments like
+    /header/.
+  - How could you ever hope to write full-coverage tests for this function? I
+    think this one function does too much.
+  - Overall, I think we need to write out what this function is supposed to do
+    and then restructure it to appropriately meet those goals.
+
+** 16 May 2020
+- Was a bit hasty reaching for ~conda-build~ and wound up confused. All we
+  really need is a virtual environment and ~pip install --editable .~
+  - created a simple environment.yaml file
+  - updated CONTRIBUTING.rst
+- Added smoke test for the testing module in tests/__init__.py
+
+** 13 May 2020 
+- Add logging module to curate and tbv modules; verbosity flag to tbv.py
+  - info on how to do logging in python found [[https://docs.python.org/3/howto/logging.html][here]].
+- Use [[https://tox.readthedocs.io/en/latest/][tox]] and [[https://github.com/tox-dev/tox-conda][tox-conda]] for testing? Getting the testing right with conda-build
+  seems to be a bit fickle.
+
+** 12 May 2020
+- Switched to src/package/modules structure for a better time with testing, as
+  recommended in [[https://blog.ionelmc.ro/2014/05/25/python-packaging/#the-structure][this article]] linked from the PyTest documentation
+  - moved package directory to src/
+  - updated setup.py to reflect changes
+- Looked into conda develop, looks like a no-go.
+- Tried running ~tbv curate~ against the test data from Vini. None of them were
+  able to execute, although interestingly, running ~tbv curate~ with no
+  arguments DID run, and produced a directory called 'None' with the correct
+  empty folders. Should we run checks on the passed files?
+- review_threshold hardcoded -> parameter
+
+** 11 May 2020
+- Fought with ~conda-build~ for a while; findings documented under the
+  conda-build TODO above
+- Fleshed out the CLI in tbv.py a bit, added options to hand to the ~curate~ module
+  - removed hard-coded parameters from main()
+- Got package build working with ~pip~. Still worth using conda because of RDKit.
+- Got package to build using ~conda~.
+- Wrote up build process in CONTRIBUTING.rst
+- Obtained sample data for testing.
+
+** 10 May 2020
+- GOAL: remove hard-coded links; that means filenames and output_dir in
+  ~main()~ - potentially targets as well?
+- Learning more about how to use conda for development
+  - Added ~conda-build~ to env
+  - Created conda.recipe/ dir and ~meta.yaml~ within
+- Added Tasks section to DEVLOG with goals for an initial beta-release version
+  of the package.
+
+** 9 May 2020
+- Installed ~conda~, version 4.8.3
+- Created environment ~chem_cur_env~ locally using ~conda create --prefix
+  ./chem_cur-env~
+- Installed packages ~pandas~, ~rdkit~, and ~molvs~
+- Created simple directory structure:
+  + README (unchanged)
+  + Makefile (currently empty)
+  + setup.py
+  + tbv (cli for project, currently empty)
+  + chemical_curation
+    + __init__.py (empty)
+    + curate.py (existing file, unchanged)
+  + docs
+  + tests
+    + context.py (import context for tests)
+- Installed package ~click~ for creating a simpe CLI tool, ~tbv~
+- Created setup.py
+- Installed package ~sphinx~ for easily creating documentation; ran
+  ~sphinx-quickstart~ in /docs
+

@@ -1,0 +1,31 @@
+package:
+    name: chemical_curation
+    version: "0.0.1"
+
+source:
+    path: ..
+
+requirements:
+    build:
+        - python
+        - pandas
+        - click
+        - sphinx
+        - rdkit
+        - molvs
+    run:
+        - python
+        - pandas
+        - click
+        - sphinx
+        - molvs
+        - rdkit
+
+test:
+    source_files:
+        - tests
+    imports:
+        - chemical_curation
+
+about:
+    license: MIT
