@@ -88,7 +88,7 @@ class TestModificationGraph(unittest.TestCase):
 
         nodelist, count = graph_1._depth_first_traversal(graph_1.get_head(), nodelist = [], count = 0)
         print(nodelist)
-        #self.assertEqual(len(graph_1), graph_1_len + graph_2_len + 1)
+        self.assertEqual(len(graph_1), graph_1_len + graph_2_len + 1)
 
     def test_dual_merge(self):
         mod1a = modification_graph.Modification(text = "1a")
