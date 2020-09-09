@@ -5,6 +5,11 @@ from rdkit.Chem import PandasTools
 
 from rdkit import rdBase
 
+#import sys
+#sys.path.append("../
+from chemical_curation.modification_graph import Modification
+from chemical_curation.modification_graph import Modification_Graph
+
 import molvs.normalize
 import molvs.fragment
 import molvs.tautomer
@@ -21,44 +26,50 @@ import pandas
 import logging
 import pathlib
 
-#list of atoms allowed for dragon descriptor calculatoin
+#list of atoms allowed for dragon descriptor calculation
 dragon_allowed_atoms = set(["H","B","C","N","O","F","Al","Si","P","S","Cl","Cr",
     "Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Mo","Ag","Cd","In",
     "Sn","Sb","Te","I","Gd","Pt","Au","Hg","Ti","Pb","Bi"])
 
 class Mol:
-    
+
     @classmethod
     def from_rdkit_mol(cls, mol, precise_activities = None, imprecise_activities = None):
-        inchi = process_mol(mol)
-        return cls(inchi, precise_activities, imprecise_activities)
+        return cls(mol, precise_activities, imprecise_activities)
 
 
     @classmethod
     def from_mol_string(cls, mol_string, precise_activities = None, imprecise_activities = None):
-        inchi = process_mol_string(mol_string)
-        return cls(inchi, precise_activities, imprecise_activities)
+        mol = read_mol_string(mol_string)
+        return cls(mol, precise_activities, imprecise_activities)
 
     @classmethod
     def from_inchi(cls, inchi, precise_activities = None, imprecise_activities = None):
-        inchi = process_inchi(inchi)
-        return cls(inchi, precise_activities, imprecise_activities)
+        mol = read_inchi(inchi)
+        return cls(mol, precise_activities, imprecise_activities)
 
     @classmethod
     def from_smiles(cls, smiles, precise_activities = None, imprecise_activities = None):
-        inchi = process_smiles(smiles)
-        return cls(inchi, precise_activities, imprecise_activities)
+        mol = read_smiles(smiles)
+        return cls(mol, precise_activities, imprecise_activities)
 
     #activities should be a dict of name:value (e.g. {'kd':7})
     #assume nanomolar for concentrations
-    def __init__(self, inchi, precise_activities, imprecise_activities):
+    def __init__(self, mol, precise_activities, imprecise_activities):
 
         if precise_activities == None and imprecise_activities == None:
             raise Exception("no activity provided to Mol init())")
 
         self.precise_activities = precise_activities
         self.imprecise_activities = imprecise_activities
-        self.inchi = inchi
+        self.history = Modification_Graph()
+        self.history.add_modification(text = "initialized")
+        self.mol = mol
+        self.rejected = False
+
+        self.process_mol()
+
+
 
     def has_activity(self, activity_name):
         if self.precise_activities and self.imprecise_activities:
@@ -85,8 +96,96 @@ class Mol:
     def get_imprecise_activity(self, activity_name):
         return self.imprecise_activities[activity_name]
 
+    def check_valid_atoms(self, allowed_list = dragon_allowed_atoms):
+        for atom in self.mol.GetAtoms():
+            s = atom.GetSymbol()
+            if s not in allowed_list:
+                self.rejected = True
+                self.history.add_modification(text = f"REJECT: '{s}' atom not in list of allowed atoms")
+                return False
+        return True
+
+
+    def process_mol(self):
+
+        mol = self.mol
+
+        #removal of mixtures
+        fragmenter_object = molvs.fragment.LargestFragmentChooser(prefer_organic = True)
+        newmol = fragmenter_object.choose(mol)
+        if newmol is None:
+            self.history.add_modification(text = "REJECT: Fragment chooser failed")
+            self.rejected = True
+            return False
+
+        if Chem.MolToInchi(newmol) != Chem.MolToInchi(mol):
+            self.history.add_modification(text = "Detected mixture, chose largest fragment")
+            mol = newmol
+
+        #removal of inorganics
+        if not molvs.fragment.is_organic(mol):
+            self.history.add_modification(text = "REJECT: Molecule is not organic")
+            self.rejected = True
+            return False
+
+        #removal of salts
+        remover = SaltRemover.SaltRemover()
+        newmol = remover.StripMol(mol, dontRemoveEverything=True) #tartrate is listed as a salt? what do?
+        if newmol is None:
+            self.history.add_modification(text = "REJECT: Salt removal failed")
+            self.rejected = True
+            return False
+        if Chem.MolToInchi(newmol) != Chem.MolToInchi(mol):
+            self.history.add_modification(text = "Detected salts, removed")
+            mol = newmol
+
+        #structure normalization
+        normalizer = molvs.normalize.Normalizer(normalizations=molvs.normalize.NORMALIZATIONS,
+                max_restarts = molvs.normalize.MAX_RESTARTS)
+        newmol = normalizer.normalize(mol)
+        if newmol is None:
+            self.history.add_modification(text = "REJECT: Normalization failed")
+            self.rejected = True
+            return False
+        if Chem.MolToInchi(newmol) != Chem.MolToInchi(mol):
+            self.history.add_modification(text = "Normalization(s) applied")
+            mol = newmol
+
+        #tautomer selection
+        tautomerizer = molvs.tautomer.TautomerCanonicalizer(transforms=molvs.tautomer.TAUTOMER_TRANSFORMS, scores =
+                molvs.tautomer.TAUTOMER_SCORES, max_tautomers=molvs.tautomer.MAX_TAUTOMERS)
+        newmol = tautomerizer(mol)
+        if newmol is None:
+            self.history.add_modification(text = "REJECT: Tautomerization failed")
+            self.rejected = True
+            return False
+        if Chem.MolToInchi(newmol) != Chem.MolToInchi(mol):
+            self.history.add_modification(text = "Tautomer(s) canonicalized")
+            mol = newmol
+
+        #disconnect metals
+        metal_remover = molvs.metal.MetalDisconnector()
+        newmol = metal_remover.disconnect(mol)
+        if newmol is None:
+            self.history.add_modification(text = "REJECT: Metal removal failed")
+            self.rejected = True
+            return False
+        if Chem.MolToInchi(newmol) != Chem.MolToInchi(mol):
+            self.history.add_modification(text = "Metal(s) disconnected")
+            mol = newmol
+
+        #final check for only valid atoms
+        passed_valid = self.check_valid_atoms()
+        if not passed_valid:
+            return False
+
+        self.history.add_modification(text = "Passed validation")
+        self.mol = mol
+
+        return True
+
     def __str__(self):
-        return f"{self.inchi}\n Precise: {self.precise_activities}\n Imprecise: {self.imprecise_activities}\n"
+        return f"{Chem.MolToInchi(self.mol)}\n Precise: {self.precise_activities}\n Imprecise: {self.imprecise_activities}\n"
 
     def __repr__(self):
         return self.__str__()
@@ -331,74 +430,24 @@ def extend_dict(a, b):
                 a[key] = [value]
 
 #performs structure standardization and mixture handling, outputs inchi
-def process_mol_string(mol_string):
+def read_mol_string(mol_string):
 
     mol = Chem.MolFromMolBlock(mol_string)
-    processed_inchi = process_mol(mol)
-    return processed_inchi
+    if mol == None:
+        raise Exception("Failed to read mol string with rdkit")
+    return mol
 
-def process_inchi(inchi):
+def read_inchi(inchi):
     mol = Chem.MolFromInchi(inchi)
-    processed_inchi = process_mol(mol)
-    return processed_inchi
+    if mol is None:
+        raise ManualReviewException(f"Inchi '{smiles}' does not parse successfully")
+    return mol
 
-def process_smiles(smiles):
+def read_smiles(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise ManualReviewException(f"SMILES string '{smiles}' does not parse successfully")
-    processed_inchi = process_mol(mol)
-    return processed_inchi
-
-def check_valid_atoms(mol, allowed_list = dragon_allowed_atoms):
-    for atom in mol.GetAtoms():
-        s = atom.GetSymbol()
-        if s not in allowed_list:
-            raise ManualReviewException(f"'{s}' atom not in list of allowed atoms") 
-
-def process_mol(mol):
-
-    #removal of mixtures
-    fragmenter_object = molvs.fragment.LargestFragmentChooser(prefer_organic = True)
-    mol = fragmenter_object.choose(mol)
-    if mol is None:
-        logging.info("Mixture removal failed for molecule")
-
-    #removal of inorganics
-    if not molvs.fragment.is_organic(mol):
-        raise ManualReviewException("Molecule is not organic")
-
-    #removal of salts
-    remover = SaltRemover.SaltRemover()
-    mol = remover.StripMol(mol, dontRemoveEverything=True) #tartrate is listed as a salt? what do?
-    if mol is None:
-        raise ManualReviewException("Salt removal failed for molecule")
-
-    #structure normalization
-    normalizer = molvs.normalize.Normalizer(normalizations=molvs.normalize.NORMALIZATIONS,
-            max_restarts = molvs.normalize.MAX_RESTARTS)
-    mol = normalizer.normalize(mol)
-    if mol is None:
-        raise ManualReviewException("Normalization failed for molecule")
-
-    #tautomer selection
-    tautomerizer = molvs.tautomer.TautomerCanonicalizer(transforms=molvs.tautomer.TAUTOMER_TRANSFORMS, scores =
-            molvs.tautomer.TAUTOMER_SCORES, max_tautomers=molvs.tautomer.MAX_TAUTOMERS)
-    if mol is None:
-        raise ManualReviewException("Tautomerization failed for molecule")
-
-    #disconnect metals
-    metal_remover = molvs.metal.MetalDisconnector()
-    mol = metal_remover.disconnect(mol)
-    if mol is None:
-        raise ManualReviewException("Metal removal failed for molecule")
-
-    #final check for only valid atoms
-    check_valid_atoms(mol)
-
-    inchi = Chem.MolToInchi(mol)
-
-    return inchi
-
+    return mol
 def imprecise_strings_equal(s1, s2):
 
     s1_sign = s1[0]

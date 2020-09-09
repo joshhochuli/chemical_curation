@@ -14,7 +14,12 @@ class Modification_Graph:
 
         return self.head
 
-    def add_modification(self, mod):
+    def add_modification(self, mod = None, text = None):
+        if mod != None and text != None:
+            raise Exception("add_modification takes one of 'mod' and 'text', not both")
+
+        if text:
+            mod = Modification(text = text)
 
         if self.head:
             mod.set_parent(self.head)
@@ -39,6 +44,20 @@ class Modification_Graph:
             curr_mod = curr_mod.parents[0]
             print(curr_mod)
 
+    #returns True if any modification has `text` as a substring
+    def has_modification(self, text):
+
+        nodelist, count = self._depth_first_traversal(node = self.head, nodelist = [], count = 0)
+        print(nodelist)
+        found = False
+        for node in nodelist:
+            if type(node) == Modification:
+                if text in node.text:
+                    found = True
+                    break
+
+        return found
+
     def _depth_first_traversal(self, node, nodelist, count):
 
         nodelist.append(node)
@@ -62,7 +81,6 @@ class Modification_Graph:
 
     def __len__(self):
 
-        
         if self.head == None:
             return 0
         else:
@@ -78,6 +96,11 @@ class Modification_Graph:
             nodelist, count = self._depth_first_traversal(self.head, [], 0)
             print(nodelist)
             return count
+
+    def __repr__(self):
+            nodelist, count = self._depth_first_traversal(self.head, [], 0)
+            return "\n".join([str(node) for node in nodelist])
+
 
 
 
